@@ -72,7 +72,16 @@ func (client *Client) Run() error {
 	}
 	defer input_file.Close()
 
+	outputFile, err := os.Create(client.config.OutputFile)
+	if err != nil {
+		logger.Error("create-output-file", logger.Fail, "err", err)
+		return err
+	}
+	defer outputFile.Close()
+
 	reader := bufio.NewScanner(input_file)
+	writer := bufio.NewWriter(outputFile)
+	defer writer.Flush()
 
 	messageId := 0
 
@@ -99,7 +108,7 @@ func (client *Client) Run() error {
 			return err
 		}
 
-		if err := writeServerResponse(client.config.OutputFile, string(responseBuffer)); err != nil {
+		if err := writeServerResponse(writer, string(responseBuffer)); err != nil {
 			logger.Error("write-response", logger.Fail, messageArgs...)
 			return err
 		}
@@ -111,24 +120,12 @@ func (client *Client) Run() error {
 	return nil
 }
 
-func writeServerResponse(filePath string, response string) error {
-	outputFile, err := os.Create(filePath)
-	if err != nil {
-		logger.Error("create-output-file", logger.Fail, "err", err)
-		return err
-	}
-	defer outputFile.Close()
-
-	writer := bufio.NewWriter(outputFile)
-
-	_, err = writer.WriteString(response + "\n")
+func writeServerResponse(writer *bufio.Writer, response string) error {
+	_, err := writer.WriteString(response + "\n")
 	if err != nil {
 		logger.Error("write-output-file", logger.Fail, "err", err)
 		return err
 	}
-
-	writer.Flush() // MANEJAR ERROR
-
 	return nil
 }
 
