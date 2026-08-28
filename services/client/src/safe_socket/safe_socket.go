@@ -8,10 +8,10 @@ func SendAll(socket io.Writer, bytes []byte) error {
 	bytes_sent := 0
 	for bytes_sent < len(bytes) {
 		bytes_written, err := socket.Write(bytes[bytes_sent:])
-		bytes_sent += bytes_written
 		if err != nil {
 			return err
 		}
+		bytes_sent += bytes_written
 	}
 	return nil
 }
@@ -29,5 +29,5 @@ func RecvAll(socket io.Reader, size int) ([]byte, error) {
 			return nil, err
 		}
 	}
-	return buff[:n], nil
+	return buff[:bytes_received], nil
 }
