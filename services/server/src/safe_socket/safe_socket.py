@@ -4,7 +4,7 @@ import socket
 
 def recv_all(socket: socket.socket, size):
     bytes_received = 0
-    buffer = bytearray(size)
+    buffer = bytearray()
     while bytes_received < size: 
         data = socket.recv(size - bytes_received)
         bytes_received += len(data)
