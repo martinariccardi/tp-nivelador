@@ -42,10 +42,9 @@ class Server:
 
     def _choose_winners(self, agency_id):
         bets = self.lottery.load_bets()
-        agency_bets = [bet for bet in bets if bet.agency_id == int(agency_id)]
         winners = []
-        for bet in agency_bets:
-            if self.lottery.has_won(bet):
+        for bet in bets:
+            if bet.agency_id == int(agency_id) and self.lottery.has_won(bet):
                 winners.append(bet)
         return winners
 

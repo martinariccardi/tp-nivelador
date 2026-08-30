@@ -4,14 +4,16 @@ from lottery.bet import Bet
 TLV_BET_TYPE = 0x01
 TLV_END_TYPE = 0x02
 TLV_WINNERS_TYPE = 0x03
-EXPECTED_FIELDS = 5
-TLV_HEADER_SIZE = 2
+EXPECTED_FIELDS = 6
+TLV_HEADER_SIZE = 4
 
 def serialize_tlv_message(msg_type, payload):
-    return bytes([msg_type, len(payload)]) + bytes(payload)
+    header = msg_type.to_bytes(2, byteorder='big') + len(payload).to_bytes(2, byteorder='big')
+    return header + bytes(payload)
 
 def serialize_bet(bet):
     fields = [
+        str(bet.agency_id),
         str(bet.first_name),
         str(bet.last_name),
         str(bet.document),
@@ -22,8 +24,8 @@ def serialize_bet(bet):
     payload = bytearray()
     for field_index, field in enumerate(fields, start=1):
         field_bytes = field.encode("utf-8")
-        payload.append(field_index)
-        payload.append(len(field_bytes))
+        payload.extend(field_index.to_bytes(2, byteorder='big'))
+        payload.extend(len(field_bytes).to_bytes(2, byteorder='big'))
         payload.extend(field_bytes)
 
     return serialize_tlv_message(TLV_BET_TYPE, payload)
@@ -34,7 +36,7 @@ def serialize_winners(winners):
     for winner in winners:
         bet_bytes = serialize_bet(winner)
         # Ignore NEW_BET header
-        payload.extend(bet_bytes[2:])
+        payload.extend(bet_bytes[TLV_HEADER_SIZE:])
     return serialize_tlv_message(TLV_WINNERS_TYPE, payload)
 
 
@@ -44,8 +46,8 @@ def deserialize(socket):
     if not header:
         return None
 
-    tlv_type = header[0]
-    tlv_size = header[1]
+    tlv_type = int.from_bytes(header[0:2], byteorder='big')
+    tlv_size = int.from_bytes(header[2:4], byteorder='big')
 
     if tlv_type == TLV_BET_TYPE:
         tlv_value = safe_socket.recv_all(socket, tlv_size)
@@ -61,6 +63,7 @@ def deserialize(socket):
             "data": agency_id,
         }
     elif tlv_type == TLV_WINNERS_TYPE:
+        # manejar error
         pass
     else:
         raise ValueError(f"Tipo de mensaje no reconocido: {tlv_type}")
@@ -70,7 +73,7 @@ def extract_bet(bet):
     index = 0
     elems = []
     while index < len(bet):
-        length = int(bet[index + 1])
+        length = int.from_bytes(bet[index+2:index+4], byteorder='big')
         index += TLV_HEADER_SIZE
         content = bet[index:index + length].decode("utf-8")
         elems.append(content)
@@ -87,5 +90,4 @@ def extract_bet(bet):
 
 
 def send_winners(socket, winners):
-    print(f"[SERVER] enviando ganadores serializado: {winners}")
     safe_socket.send_all(socket, serialize_winners(winners))
