@@ -3,15 +3,16 @@ import sys
 
 import logger
 import server
-from src_frozen.lottery import Lottery
+from lottery import Lottery
 
 SERVER_HOST = os.environ["SERVER_HOST"]
 SERVER_PORT = int(os.environ["SERVER_PORT"])
+STORAGE_PATH = os.environ["OUTPUT_FILE"]
 
 
 def main():
     logger.init()
-    s = server.Server(SERVER_HOST, SERVER_PORT, Lottery.init())
+    s = server.Server(SERVER_HOST, SERVER_PORT, STORAGE_PATH)
     try:
         s.run()
     except Exception as e:

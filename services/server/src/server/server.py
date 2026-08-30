@@ -1,17 +1,14 @@
 import socket
 import logger
 import safe_socket
-import protocol
-from src_frozen.lottery import Lottery
-
-_ECHO_SERVER_MESSAGE_SIZE = 1024
-
+from . import protocol
+from lottery import Lottery
 
 class Server:
-    def __init__(self, server_host: str, server_port: int) -> None:
+    def __init__(self, server_host: str, server_port: int, storage_path: string) -> None:
         self.server_host = server_host
         self.server_port = server_port
-        self.lottery = Lottery
+        self.lottery = Lottery(storage_path)
 
     def _handle_client(self, client_socket):
         action = "handle-client"
@@ -20,6 +17,7 @@ class Server:
             logger.info(action, logger.LogResult.in_progress)
             while True:
                 client_message = protocol.deserialize(client_socket)
+                print(f"[SERVER] mensaje recibido: {client_message}")
                 if not client_message:
                     logger.info(
                         action,
@@ -29,10 +27,12 @@ class Server:
                     )
                     return
                 message_amount += 1
-                if client_message["type"] == "END BATCH":
+                if client_message["type"] == "END_BETS":
                     winners = self._choose_winners()
-                    protocol.send_winners(client_socket, winners)  
-                else: 
+                    print(f"[SERVER] enviando ganadores: {winners}")
+                    protocol.send_winners(client_socket, winners)
+                else:
+                    print(f"[SERVER] guardando apuesta: {client_message['data']}")
                     self.lottery.store_bets([client_message["data"]])
         except Exception as e:
             logger.error(
