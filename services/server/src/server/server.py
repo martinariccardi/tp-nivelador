@@ -5,7 +5,7 @@ from . import protocol
 from lottery import Lottery
 
 class Server:
-    def __init__(self, server_host: str, server_port: int, storage_path: string) -> None:
+    def __init__(self, server_host: str, server_port: int, storage_path: str) -> None:
         self.server_host = server_host
         self.server_port = server_port
         self.lottery = Lottery(storage_path)
