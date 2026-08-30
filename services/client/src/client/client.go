@@ -93,7 +93,16 @@ func (client *Client) Run() error {
 		logger.Info(mainAction, logger.InProgress, messageArgs...)
 
 		clientMessage := reader.Text()
-		serializedMessage := serialize(clientMessage, client.config.AgencyId)
+
+		bet, err := parseBetFromCsv(clientMessage, client.config.AgencyId)
+		if err != nil {
+			return err
+		}
+
+		serializedMessage, err := serialize_bet(bet)
+		if err != nil {
+			return err
+		}
 
 		logger.Info("send-message", logger.InProgress,
 			"agency-id", client.config.AgencyId,
@@ -115,7 +124,11 @@ func (client *Client) Run() error {
 	}
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 
-	endBetsMessage := serialize_end_message(client.config.AgencyId)
+	endBetsMessage, err := serialize_end_message(client.config.AgencyId)
+	if err != nil {
+		return err
+	}
+
 	if err := safe_socket.SendAll(client.conn, endBetsMessage); err != nil {
 		return err
 	}
