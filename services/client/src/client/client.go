@@ -1,10 +1,12 @@
 package client
 
 import (
-	"net"
-	"time"
 	"bufio"
+	"fmt"
+	"net"
 	"os"
+	"time"
+
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/logger"
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/safe_socket"
 )
@@ -91,42 +93,60 @@ func (client *Client) Run() error {
 		logger.Info(mainAction, logger.InProgress, messageArgs...)
 
 		clientMessage := reader.Text()
+		serializedMessage := serialize(clientMessage)
 
-		if err := safe_socket.SendAll(client.conn, []byte(clientMessage)); err != nil {
+		logger.Info("send-message", logger.InProgress,
+			"agency-id", client.config.AgencyId,
+			"message-id", messageId,
+			"payload", string(serializedMessage),
+			"payload-len", len(serializedMessage),
+		)
+
+		if err := safe_socket.SendAll(client.conn, serializedMessage); err != nil {
 			logger.Error("send-message", logger.Fail, messageArgs...)
 			return err
 		}
 
-		responseBuffer, err := safe_socket.RecvAll(client.conn, ECHO_CLIENT_BUFFER_SIZE)
-		if err != nil {
-			logger.Error("recv-response", logger.Fail, messageArgs...)
-			return err
-		}
-
-		if string(responseBuffer) != clientMessage {
-			logger.Error("check-response", logger.Fail, messageArgs...)
-			return err
-		}
-
-		if err := writeServerResponse(writer, string(responseBuffer)); err != nil {
-			logger.Error("write-response", logger.Fail, messageArgs...)
-			return err
-		}
-
-		time.Sleep(ECHO_CLIENT_MESSAGE_DELAY_MS * time.Millisecond)
+		logger.Info("send-message", logger.Success,
+			"agency-id", client.config.AgencyId,
+			"message-id", messageId,
+			"sent-bytes", len(serializedMessage),
+		)
 	}
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 
-	return nil
-}
-
-func writeServerResponse(writer *bufio.Writer, response string) error {
-	_, err := writer.WriteString(response + "\n")
-	if err != nil {
-		logger.Error("write-output-file", logger.Fail, "err", err)
+	endBetsMessage := []byte{TLV_END_TYPE, 0x00}
+	if err := safe_socket.SendAll(client.conn, endBetsMessage); err != nil {
 		return err
 	}
+
+	winners, err := deserialize(client.conn)
+	if err != nil {
+		return err
+	}
+
+	if err := storeWinners(writer, winners); err != nil {
+		return err
+	}
+
 	return nil
 }
 
+func storeWinners(writer *bufio.Writer, winners []Bet) error {
+	for _, winner := range winners {
+		line := fmt.Sprintf("%s,%s,%s,%s,%s\n",
+			winner.FirstName,
+			winner.LastName,
+			winner.Id,
+			winner.Birthdate,
+			winner.BetNumber,
+		)
+		_, err := writer.WriteString(line)
+		if err != nil {
+			logger.Error("write-output-file", logger.Fail, "err", err)
+			return err
+		}
+	}
 
+	return nil
+}

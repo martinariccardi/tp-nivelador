@@ -8,54 +8,87 @@ import (
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/safe_socket"
 )
 
-const TLV_BET_TYPE byte = 0x03
+type Bet struct {
+	FirstName string
+	LastName  string
+	Id        string
+	Birthdate string
+	BetNumber string
+}
+
+const TLV_BET_TYPE byte = 0x01
+const TLV_END_TYPE byte = 0x02
+const TLV_WINNER_TYPE byte = 0x03
 const EXPECTED_FIELDS = 5
 const TLV_HEADER_SIZE = 2
 
+func serialize_tlv_message(msg_type byte, payload []byte) []byte {
+	var message bytes.Buffer
+	message.WriteByte(msg_type)
+	message.WriteByte(byte(len(payload)))
+	message.Write(payload)
+	return message.Bytes()
+}
+
 func serialize(msg string) []byte {
-	var serialized_msg bytes.Buffer
+	var payload bytes.Buffer
 	parts := strings.Split(msg, ",")
 
-	// Build header
-	serialized_msg.WriteByte(TLV_BET_TYPE)
-	serialized_msg.WriteByte(byte(len(msg) - EXPECTED_FIELDS - 1))
 	// Build body
 	for i, part := range parts {
 		// Type
-		serialized_msg.WriteByte(byte(i + 1))
+		payload.WriteByte(byte(i + 1))
 		// Size
-		serialized_msg.WriteByte(byte(len(part)))
+		payload.WriteByte(byte(len(part)))
 		// Value
-		serialized_msg.WriteString(part)
+		payload.WriteString(part)
 	}
-
-	return serialized_msg.Bytes()
+	return serialize_tlv_message(TLV_BET_TYPE, payload.Bytes())
 }
 
-func deserialize(msg []byte, socket io.Reader) string {
-	var deserialized_msg strings.Builder
+// Mejorar
+func deserialize(socket io.Reader) ([]Bet, error) {
+	header, err := safe_socket.RecvAll(socket, TLV_HEADER_SIZE)
+	if err != nil {
+		return nil, err
+	}
 
-	header, _ := safe_socket.RecvAll(socket, TLV_HEADER_SIZE)
 	tlv_size := int(header[1])
-	total_size := tlv_size + (EXPECTED_FIELDS * TLV_HEADER_SIZE)
-	tlv_value, _ := safe_socket.RecvAll(socket, total_size)
+	tlv_value, err := safe_socket.RecvAll(socket, tlv_size)
+	if err != nil {
+		return nil, err
+	}
 
 	index := 0
 	params := 0
-	for index < total_size {
-		lenght := int(tlv_value[index+1])
+	var currentFields [EXPECTED_FIELDS]string
+	var winners []Bet
+	for index < tlv_size {
+		tlvType := int(tlv_value[index])
+		length := int(tlv_value[index+1])
 		index += TLV_HEADER_SIZE
 
-		content := string(tlv_value[index : index+lenght])
-		deserialized_msg.WriteString(content)
+		content := string(tlv_value[index : index+length])
 
-		if params < EXPECTED_FIELDS {
-			deserialized_msg.WriteString(",")
+		if tlvType >= 1 && params < EXPECTED_FIELDS {
+			currentFields[tlvType-1] = content
 		}
+		params++
+		index += length
 
-		index += lenght
+		if params == EXPECTED_FIELDS {
+			bet := Bet{
+				FirstName: currentFields[0],
+				LastName:  currentFields[1],
+				Id:        currentFields[2],
+				Birthdate: currentFields[3],
+				BetNumber: currentFields[4],
+			}
+			winners = append(winners, bet)
+			params = 0
+		}
 	}
 
-	return deserialized_msg.String()
+	return winners, nil
 
 }
