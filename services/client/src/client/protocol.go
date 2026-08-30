@@ -30,14 +30,24 @@ func serialize_tlv_message(msg_type byte, payload []byte) []byte {
 	return message.Bytes()
 }
 
-func serialize(msg string) []byte {
+func serialize_end_message(agencyId string) []byte {
+	payload := []byte(agencyId)
+	return serialize_tlv_message(TLV_END_TYPE, payload)
+}
+
+func serialize(msg string, agencyId string) []byte {
 	var payload bytes.Buffer
 	parts := strings.Split(msg, ",")
+
+	// Add agency id
+	payload.WriteByte(1)
+	payload.WriteByte(byte(len(agencyId)))
+	payload.WriteString(agencyId)
 
 	// Build body
 	for i, part := range parts {
 		// Type
-		payload.WriteByte(byte(i + 1))
+		payload.WriteByte(byte(i + 2))
 		// Size
 		payload.WriteByte(byte(len(part)))
 		// Value
@@ -46,7 +56,6 @@ func serialize(msg string) []byte {
 	return serialize_tlv_message(TLV_BET_TYPE, payload.Bytes())
 }
 
-// Mejorar
 func deserialize(socket io.Reader) ([]Bet, error) {
 	header, err := safe_socket.RecvAll(socket, TLV_HEADER_SIZE)
 	if err != nil {

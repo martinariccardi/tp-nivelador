@@ -28,7 +28,7 @@ class Server:
                     return
                 message_amount += 1
                 if client_message["type"] == "END_BETS":
-                    winners = self._choose_winners()
+                    winners = self._choose_winners(client_message["data"])
                     print(f"[SERVER] enviando ganadores: {winners}")
                     protocol.send_winners(client_socket, winners)
                 else:
@@ -40,10 +40,11 @@ class Server:
             )
             raise e
 
-    def _choose_winners(self):
+    def _choose_winners(self, agency_id):
         bets = self.lottery.load_bets()
+        agency_bets = [bet for bet in bets if bet.agency_id == int(agency_id)]
         winners = []
-        for bet in bets:
+        for bet in agency_bets:
             if self.lottery.has_won(bet):
                 winners.append(bet)
         return winners

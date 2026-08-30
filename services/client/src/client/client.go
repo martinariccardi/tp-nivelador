@@ -93,7 +93,7 @@ func (client *Client) Run() error {
 		logger.Info(mainAction, logger.InProgress, messageArgs...)
 
 		clientMessage := reader.Text()
-		serializedMessage := serialize(clientMessage)
+		serializedMessage := serialize(clientMessage, client.config.AgencyId)
 
 		logger.Info("send-message", logger.InProgress,
 			"agency-id", client.config.AgencyId,
@@ -115,7 +115,7 @@ func (client *Client) Run() error {
 	}
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 
-	endBetsMessage := []byte{TLV_END_TYPE, 0x00}
+	endBetsMessage := serialize_end_message(client.config.AgencyId)
 	if err := safe_socket.SendAll(client.conn, endBetsMessage); err != nil {
 		return err
 	}

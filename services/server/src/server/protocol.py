@@ -54,9 +54,11 @@ def deserialize(socket):
             "data": extract_bet(tlv_value),
         }
     elif tlv_type == TLV_END_TYPE:
+        tlv_value = safe_socket.recv_all(socket, tlv_size)
+        agency_id = tlv_value.decode('utf-8')
         return {
             "type": "END_BETS",
-            "data": None,
+            "data": agency_id,
         }
     elif tlv_type == TLV_WINNERS_TYPE:
         pass
@@ -75,12 +77,12 @@ def extract_bet(bet):
         index += length
 
     return Bet(
-        agency_id=0,
-        first_name=elems[0],
-        last_name=elems[1],
-        document=int(elems[2]),
-        birthdate=elems[3],
-        number=int(elems[4]),
+        agency_id=int(elems[0]),
+        first_name=elems[1],
+        last_name=elems[2],
+        document=int(elems[3]),
+        birthdate=elems[4],
+        number=int(elems[5]),
     )
 
 
