@@ -107,8 +107,6 @@ func (client *Client) Run() error {
 		logger.Info("send-message", logger.InProgress,
 			"agency-id", client.config.AgencyId,
 			"message-id", messageId,
-			"payload", string(serializedMessage),
-			"payload-len", len(serializedMessage),
 		)
 
 		if err := safe_socket.SendAll(client.conn, serializedMessage); err != nil {
