@@ -17,7 +17,6 @@ class Server:
             logger.info(action, logger.LogResult.in_progress)
             while True:
                 client_message = protocol.deserialize(client_socket)
-                print(f"[SERVER] mensaje recibido: {client_message}")
                 if not client_message:
                     logger.info(
                         action,
@@ -27,12 +26,12 @@ class Server:
                     )
                     return
                 message_amount += 1
+                # Mejorar
                 if client_message["type"] == "END_BETS":
                     winners = self._choose_winners(client_message["data"])
-                    print(f"[SERVER] enviando ganadores: {winners}")
-                    protocol.send_winners(client_socket, winners)
+                    self.send_winners(client_socket, winners)
+                    return
                 else:
-                    print(f"[SERVER] guardando apuesta: {client_message['data']}")
                     self.lottery.store_bets([client_message["data"]])
         except Exception as e:
             logger.error(
@@ -48,6 +47,8 @@ class Server:
                 winners.append(bet)
         return winners
 
+    def send_winners(self, socket, winners):
+        safe_socket.send_all(socket, protocol.serialize_winners(winners))
 
     def run(self):
         action = "accept-connection"

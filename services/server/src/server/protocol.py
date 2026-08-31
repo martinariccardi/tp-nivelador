@@ -42,7 +42,6 @@ def serialize_winners(winners):
 
 def deserialize(socket):
     header = safe_socket.recv_all(socket, TLV_HEADER_SIZE)
-    print("header:", header, list(header))
     if not header:
         return None
 
@@ -89,5 +88,3 @@ def extract_bet(bet):
     )
 
 
-def send_winners(socket, winners):
-    safe_socket.send_all(socket, serialize_winners(winners))
