@@ -25,6 +25,7 @@ services:
       - AGENCY_ID=0
       - SERVER_HOST=server
       - SERVER_PORT=5678
+      - BATCH_SIZE=5
     volumes:
       - ./input:/input
       - ./output:/output
@@ -42,6 +43,7 @@ services:
       - AGENCY_ID=1
       - SERVER_HOST=server
       - SERVER_PORT=5678
+      - BATCH_SIZE=5
     volumes:
       - ./input:/input
       - ./output:/output
@@ -59,6 +61,7 @@ services:
       - AGENCY_ID=2
       - SERVER_HOST=server
       - SERVER_PORT=5678
+      - BATCH_SIZE=5
     volumes:
       - ./input:/input
       - ./output:/output
@@ -76,6 +79,7 @@ services:
       - AGENCY_ID=3
       - SERVER_HOST=server
       - SERVER_PORT=5678
+      - BATCH_SIZE=5
     volumes:
       - ./input:/input
       - ./output:/output
@@ -93,6 +97,7 @@ services:
       - AGENCY_ID=4
       - SERVER_HOST=server
       - SERVER_PORT=5678
+      - BATCH_SIZE=5
     volumes:
       - ./input:/input
       - ./output:/output
@@ -110,6 +115,7 @@ services:
       - AGENCY_ID=5
       - SERVER_HOST=server
       - SERVER_PORT=5678
+      - BATCH_SIZE=5
     volumes:
       - ./input:/input
       - ./output:/output
