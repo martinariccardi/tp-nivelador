@@ -111,9 +111,7 @@ func (client *Client) Run() error {
 				return err
 			}
 
-			fmt.Printf("[CLIENT DEBUG] enviando batch size=%d bytes=%d\n", len(collected_bets), len(serializedBatch))
 			if err := safe_socket.SendAll(client.conn, serializedBatch); err != nil {
-				fmt.Printf("[CLIENT DEBUG] error al enviar batch: %v\n", err)
 				logger.Error("send-message", logger.Fail, messageArgs...)
 				return err
 			}
@@ -136,9 +134,7 @@ func (client *Client) Run() error {
 			return err
 		}
 
-		fmt.Printf("[CLIENT DEBUG] enviando batch final size=%d bytes=%d\n", len(collected_bets), len(serializedBatch))
 		if err := safe_socket.SendAll(client.conn, serializedBatch); err != nil {
-			fmt.Printf("[CLIENT DEBUG] error al enviar batch final: %v\n", err)
 			logger.Error("send-remaining-message", logger.Fail, "agency-id", client.config.AgencyId, "err", err)
 			return err
 		}
@@ -157,19 +153,14 @@ func (client *Client) Run() error {
 		return err
 	}
 
-	fmt.Printf("[CLIENT DEBUG] enviando END_BETS agency_id=%s bytes=%d\n", client.config.AgencyId, len(endBetsMessage))
 	if err := safe_socket.SendAll(client.conn, endBetsMessage); err != nil {
-		fmt.Printf("[CLIENT DEBUG] error al enviar END_BETS: %v\n", err)
 		return err
 	}
 
-	fmt.Printf("[CLIENT DEBUG] esperando respuesta del servidor...\n")
 	winners, err := deserialize(client.conn)
 	if err != nil {
-		fmt.Printf("[CLIENT DEBUG] error leyendo ganadores: %v\n", err)
 		return err
 	}
-	fmt.Printf("[CLIENT DEBUG] recibidos %d ganadores\n", len(winners))
 
 	if err := storeWinners(writer, winners); err != nil {
 		return err
