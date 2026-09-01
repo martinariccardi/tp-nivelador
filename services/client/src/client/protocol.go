@@ -9,9 +9,10 @@ import (
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/safe_socket"
 )
 
-const TLV_BET_TYPE uint16 = 0x01
+const TLV_NEW_BET_TYPE uint16 = 0x01
 const TLV_END_TYPE uint16 = 0x02
 const TLV_WINNER_TYPE uint16 = 0x03
+const TLV_NEW_BATCH_TYPE uint16 = 0x04
 const EXPECTED_FIELDS = 6
 const TLV_HEADER_SIZE = 4
 
@@ -57,7 +58,22 @@ func serialize_bet(bet Bet) ([]byte, error) {
 		payload.WriteString(field)
 	}
 
-	return serialize_tlv_message(TLV_BET_TYPE, payload.Bytes())
+	return serialize_tlv_message(TLV_NEW_BET_TYPE, payload.Bytes())
+}
+
+func serialize_batch(bets []Bet) ([]byte, error) {
+	payload := new(bytes.Buffer)
+	for _, bet := range bets {
+		serialized_bet, err := serialize_bet(bet)
+		if err != nil {
+			return nil, err
+		}
+		_, err = payload.Write(serialized_bet)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return serialize_tlv_message(TLV_NEW_BATCH_TYPE, payload.Bytes())
 }
 
 // Modularizar

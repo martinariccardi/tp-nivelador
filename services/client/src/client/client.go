@@ -20,6 +20,7 @@ type ClientConfig struct {
 	AgencyId   string
 	InputFile  string
 	OutputFile string
+	BatchSize  int
 }
 
 type Client struct {
@@ -83,6 +84,8 @@ func (client *Client) Run() error {
 
 	messageId := 0
 
+	collected_bets := make([]Bet, 0, client.config.BatchSize)
+
 	for reader.Scan() {
 		messageId++
 		messageArgs := []any{"agency-id", client.config.AgencyId, "message-id", messageId}
@@ -95,42 +98,78 @@ func (client *Client) Run() error {
 			return err
 		}
 
-		serializedMessage, err := serialize_bet(bet)
-		if err != nil {
-			return err
-		}
+		collected_bets = append(collected_bets, bet)
 
 		logger.Info("send-message", logger.InProgress,
 			"agency-id", client.config.AgencyId,
 			"message-id", messageId,
 		)
 
-		if err := safe_socket.SendAll(client.conn, serializedMessage); err != nil {
-			logger.Error("send-message", logger.Fail, messageArgs...)
+		if len(collected_bets) == client.config.BatchSize {
+			serializedBatch, err := serialize_batch(collected_bets)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("[CLIENT DEBUG] enviando batch size=%d bytes=%d\n", len(collected_bets), len(serializedBatch))
+			if err := safe_socket.SendAll(client.conn, serializedBatch); err != nil {
+				fmt.Printf("[CLIENT DEBUG] error al enviar batch: %v\n", err)
+				logger.Error("send-message", logger.Fail, messageArgs...)
+				return err
+			}
+
+			collected_bets = collected_bets[:0]
+
+			logger.Info("send-message", logger.Success,
+				"agency-id", client.config.AgencyId,
+				"message-id", messageId,
+				"sent-bytes", len(serializedBatch),
+			)
+		}
+
+	}
+	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
+
+	if len(collected_bets) > 0 {
+		serializedBatch, err := serialize_batch(collected_bets)
+		if err != nil {
 			return err
 		}
 
-		logger.Info("send-message", logger.Success,
+		fmt.Printf("[CLIENT DEBUG] enviando batch final size=%d bytes=%d\n", len(collected_bets), len(serializedBatch))
+		if err := safe_socket.SendAll(client.conn, serializedBatch); err != nil {
+			fmt.Printf("[CLIENT DEBUG] error al enviar batch final: %v\n", err)
+			logger.Error("send-remaining-message", logger.Fail, "agency-id", client.config.AgencyId, "err", err)
+			return err
+		}
+
+		logger.Info("send-remaining-message", logger.Success,
 			"agency-id", client.config.AgencyId,
-			"message-id", messageId,
-			"sent-bytes", len(serializedMessage),
+			"sent-bytes", len(serializedBatch),
+			"remaining-count", len(collected_bets),
 		)
+
+		collected_bets = collected_bets[:0]
 	}
-	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 
 	endBetsMessage, err := serialize_end_message(client.config.AgencyId)
 	if err != nil {
 		return err
 	}
 
+	fmt.Printf("[CLIENT DEBUG] enviando END_BETS agency_id=%s bytes=%d\n", client.config.AgencyId, len(endBetsMessage))
 	if err := safe_socket.SendAll(client.conn, endBetsMessage); err != nil {
+		fmt.Printf("[CLIENT DEBUG] error al enviar END_BETS: %v\n", err)
 		return err
 	}
 
+	fmt.Printf("[CLIENT DEBUG] esperando respuesta del servidor...\n")
 	winners, err := deserialize(client.conn)
 	if err != nil {
+		fmt.Printf("[CLIENT DEBUG] error leyendo ganadores: %v\n", err)
 		return err
 	}
+	fmt.Printf("[CLIENT DEBUG] recibidos %d ganadores\n", len(winners))
 
 	if err := storeWinners(writer, winners); err != nil {
 		return err
