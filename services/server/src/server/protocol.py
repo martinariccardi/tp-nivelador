@@ -4,6 +4,7 @@ from lottery.bet import Bet
 TLV_BET_TYPE = 0x01
 TLV_END_TYPE = 0x02
 TLV_WINNERS_TYPE = 0x03
+TLV_NEW_BATCH_TYPE = 0x04
 EXPECTED_FIELDS = 6
 TLV_HEADER_SIZE = 4
 
@@ -48,11 +49,11 @@ def deserialize(socket):
     tlv_type = int.from_bytes(header[0:2], byteorder='big')
     tlv_size = int.from_bytes(header[2:4], byteorder='big')
 
-    if tlv_type == TLV_BET_TYPE:
+    if tlv_type == TLV_NEW_BATCH_TYPE:
         tlv_value = safe_socket.recv_all(socket, tlv_size)
         return {
-            "type": "NEW_BET",
-            "data": extract_bet(tlv_value),
+            "type": "NEW_BATCH",
+            "data": extract_bets(tlv_value),
         }
     elif tlv_type == TLV_END_TYPE:
         tlv_value = safe_socket.recv_all(socket, tlv_size)
@@ -62,8 +63,7 @@ def deserialize(socket):
             "data": agency_id,
         }
     elif tlv_type == TLV_WINNERS_TYPE:
-        # manejar error
-        pass
+        raise ValueError(f"Este mensaje no debería ser recibido por el servidor")
     else:
         raise ValueError(f"Tipo de mensaje no reconocido: {tlv_type}")
 
@@ -87,4 +87,13 @@ def extract_bet(bet):
         number=int(elems[5]),
     )
 
-
+def extract_bets(payload):
+    index = 0
+    bets = []
+    while index < len(payload):
+        length = int.from_bytes(payload[index+2:index+4], byteorder='big')
+        index += TLV_HEADER_SIZE
+        content = payload[index:index + length]
+        bets.append(extract_bet(content))
+        index += length
+    return bets

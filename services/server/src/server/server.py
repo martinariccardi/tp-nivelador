@@ -32,7 +32,7 @@ class Server:
                     self.send_winners(client_socket, winners)
                     return
                 else:
-                    self.lottery.store_bets([client_message["data"]])
+                    self.lottery.store_bets(client_message["data"])
         except Exception as e:
             logger.error(
                 action, logger.LogResult.fail, "messages-amount", message_amount
