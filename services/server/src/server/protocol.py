@@ -5,6 +5,7 @@ TLV_BET_TYPE = 0x01
 TLV_END_TYPE = 0x02
 TLV_WINNERS_TYPE = 0x03
 TLV_NEW_BATCH_TYPE = 0x04
+TLV_ACK_TYPE = 0x05
 EXPECTED_FIELDS = 6
 TLV_HEADER_SIZE = 4
 
@@ -35,11 +36,11 @@ def serialize_bet(bet):
 def serialize_winners(winners):
     payload = bytearray()
     for winner in winners:
-        bet_bytes = serialize_bet(winner)
-        # Ignore NEW_BET header
-        payload.extend(bet_bytes[TLV_HEADER_SIZE:])
+        payload.extend(serialize_bet(winner))
     return serialize_tlv_message(TLV_WINNERS_TYPE, payload)
 
+def serialize_ack():
+    return serialize_tlv_message(TLV_ACK_TYPE, bytearray())
 
 def deserialize(socket):
     header = safe_socket.recv_all(socket, TLV_HEADER_SIZE)

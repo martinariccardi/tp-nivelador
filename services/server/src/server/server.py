@@ -33,6 +33,7 @@ class Server:
                     return
                 else:
                     self.lottery.store_bets(client_message["data"])
+                    self.send_ack(client_socket)
         except Exception as e:
             logger.error(
                 action, logger.LogResult.fail, "messages-amount", message_amount
@@ -49,6 +50,9 @@ class Server:
 
     def send_winners(self, socket, winners):
         safe_socket.send_all(socket, protocol.serialize_winners(winners))
+
+    def send_ack(self, socket):
+        safe_socket.send_all(socket, protocol.serialize_ack())
 
     def run(self):
         action = "accept-connection"
