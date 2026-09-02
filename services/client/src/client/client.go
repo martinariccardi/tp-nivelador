@@ -116,6 +116,11 @@ func (client *Client) Run() error {
 				return err
 			}
 
+			if err := deserialize_ack(client.conn); err != nil {
+				logger.Error("receive-ack", logger.Fail, "agency-id", client.config.AgencyId, "err", err)
+				return err
+			}
+
 			collected_bets = collected_bets[:0]
 
 			logger.Info("send-message", logger.Success,
@@ -139,6 +144,11 @@ func (client *Client) Run() error {
 			return err
 		}
 
+		if err := deserialize_ack(client.conn); err != nil {
+			logger.Error("receive-ack", logger.Fail, "agency-id", client.config.AgencyId, "err", err)
+			return err
+		}
+
 		logger.Info("send-remaining-message", logger.Success,
 			"agency-id", client.config.AgencyId,
 			"sent-bytes", len(serializedBatch),
@@ -157,7 +167,7 @@ func (client *Client) Run() error {
 		return err
 	}
 
-	winners, err := deserialize(client.conn)
+	winners, err := deserialize_winners(client.conn)
 	if err != nil {
 		return err
 	}

@@ -9,10 +9,11 @@ import (
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/safe_socket"
 )
 
-const TLV_NEW_BET_TYPE uint16 = 0x01
+const TLV_BET_TYPE uint16 = 0x01
 const TLV_END_TYPE uint16 = 0x02
 const TLV_WINNER_TYPE uint16 = 0x03
 const TLV_NEW_BATCH_TYPE uint16 = 0x04
+const TLV_ACK_TYPE uint16 = 0x05
 const EXPECTED_FIELDS = 6
 const TLV_HEADER_SIZE = 4
 
@@ -58,7 +59,7 @@ func serialize_bet(bet Bet) ([]byte, error) {
 		payload.WriteString(field)
 	}
 
-	return serialize_tlv_message(TLV_NEW_BET_TYPE, payload.Bytes())
+	return serialize_tlv_message(TLV_BET_TYPE, payload.Bytes())
 }
 
 func serialize_batch(bets []Bet) ([]byte, error) {
@@ -76,65 +77,77 @@ func serialize_batch(bets []Bet) ([]byte, error) {
 	return serialize_tlv_message(TLV_NEW_BATCH_TYPE, payload.Bytes())
 }
 
-// Modularizar
-func deserialize(socket io.Reader) ([]Bet, error) {
+func deserialize_ack(socket io.Reader) error {
 	header, err := safe_socket.RecvAll(socket, TLV_HEADER_SIZE)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	tlv_type := binary.BigEndian.Uint16(header[0:2])
-	tlv_size := int(binary.BigEndian.Uint16(header[2:4]))
+	tlvType := binary.BigEndian.Uint16(header[0:2])
+	_ = int(binary.BigEndian.Uint16(header[2:4]))
 
-	if tlv_type != TLV_WINNER_TYPE {
-		return nil, fmt.Errorf("tipo de mensaje inesperado")
+	switch tlvType {
+	case TLV_ACK_TYPE:
+		return nil
+	default:
+		return fmt.Errorf("tipo de mensaje inesperado")
 	}
+}
 
-	tlv_value, err := safe_socket.RecvAll(socket, tlv_size)
+func deserialize_winners(socket io.Reader) ([]Bet, error) {
+	header, err := safe_socket.RecvAll(socket, TLV_HEADER_SIZE)
 	if err != nil {
-		return nil, err
+		return []Bet{}, err
 	}
 
+	tlvType := binary.BigEndian.Uint16(header[0:2])
+	tlvSize := int(binary.BigEndian.Uint16(header[2:4]))
+
+	switch tlvType {
+	case TLV_WINNER_TYPE:
+		tlv_value, err := safe_socket.RecvAll(socket, tlvSize)
+		if err != nil {
+			return []Bet{}, err
+		}
+		return extractBets(tlv_value), nil
+	default:
+		return []Bet{}, fmt.Errorf("tipo de mensaje inesperado")
+	}
+}
+
+func extractBet(rawBet []byte) Bet {
 	index := 0
-	params := 0
-	var currentBet Bet
-	var winners []Bet
-	for index < tlv_size {
-		tlvType := binary.BigEndian.Uint16(tlv_value[index : index+2])
-		length := int(binary.BigEndian.Uint16(tlv_value[index+2 : index+4]))
+	var elems []string
+
+	for index < len(rawBet) {
+		length := int(binary.BigEndian.Uint16(rawBet[index+2 : index+4]))
 		index += TLV_HEADER_SIZE
-
-		content := string(tlv_value[index : index+length])
-
-		switch tlvType {
-		case 1, 0x0011:
-			currentBet.AgencyId = content
-			params++
-		case 2, 0x0012:
-			currentBet.FirstName = content
-			params++
-		case 3, 0x0013:
-			currentBet.LastName = content
-			params++
-		case 4, 0x0014:
-			currentBet.Id = content
-			params++
-		case 5, 0x0015:
-			currentBet.Birthdate = content
-			params++
-		case 6, 0x0016:
-			currentBet.BetNumber = content
-			params++
-		}
-
+		content := string(rawBet[index : index+length])
+		elems = append(elems, content)
 		index += length
-
-		if params == EXPECTED_FIELDS {
-			winners = append(winners, currentBet)
-			currentBet = Bet{}
-			params = 0
-		}
 	}
 
-	return winners, nil
+	return Bet{
+		AgencyId:  elems[0],
+		FirstName: elems[1],
+		LastName:  elems[2],
+		Id:        elems[3],
+		Birthdate: elems[4],
+		BetNumber: elems[5],
+	}
+}
+
+func extractBets(payload []byte) []Bet {
+	index := 0
+	var bets []Bet
+
+	for index < len(payload) {
+		length := int(binary.BigEndian.Uint16(payload[index+2 : index+4]))
+		index += TLV_HEADER_SIZE
+		content := payload[index : index+length]
+		bets = append(bets, extractBet(content))
+		index += length
+	}
+
+	return bets
 }
