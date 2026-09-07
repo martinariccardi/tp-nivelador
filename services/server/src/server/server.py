@@ -1,14 +1,17 @@
 import socket
 import logger
 import safe_socket
+import threading
 from . import protocol
 from lottery import Lottery
 
 class Server:
-    def __init__(self, server_host: str, server_port: int, storage_path: str) -> None:
+    def __init__(self, server_host: str, server_port: int, storage_path: str, agency_quorum_min: int) -> None:
         self.server_host = server_host
         self.server_port = server_port
         self.lottery = Lottery(storage_path)
+        self.barrier = threading.Barrier(agency_quorum_min)
+        self.lock = threading.Lock()
 
     def _handle_client(self, client_socket):
         action = "handle-client"
@@ -28,11 +31,13 @@ class Server:
                 message_amount += 1
                 # Mejorar
                 if client_message["type"] == "END_BETS":
+                    self.barrier.wait()
                     winners = self._choose_winners(client_message["data"])
                     self.send_winners(client_socket, winners)
                     return
                 else:
-                    self.lottery.store_bets(client_message["data"])
+                    with self.lock:
+                        self.lottery.store_bets(client_message["data"])
                     self.send_ack(client_socket)
         except Exception as e:
             logger.error(
@@ -68,4 +73,12 @@ class Server:
                     raise e
                 logger.info(action, logger.LogResult.success)
 
-                self._handle_client(client_socket)
+                thread = threading.Thread(
+                    target= self._handle_client,
+                    args=(client_socket,)                   
+                )
+                
+                thread.start()
+                
+
+   

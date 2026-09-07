@@ -8,11 +8,12 @@ from lottery import Lottery
 SERVER_HOST = os.environ["SERVER_HOST"]
 SERVER_PORT = int(os.environ["SERVER_PORT"])
 STORAGE_PATH = os.environ["OUTPUT_FILE"]
+AGENCY_QUORUM_MIN = int(os.environ["AGENCY_QUORUM_MIN"])
 
 
 def main():
     logger.init()
-    s = server.Server(SERVER_HOST, SERVER_PORT, STORAGE_PATH)
+    s = server.Server(SERVER_HOST, SERVER_PORT, STORAGE_PATH, AGENCY_QUORUM_MIN)
     try:
         s.run()
     except Exception as e:
