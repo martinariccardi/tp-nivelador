@@ -7,7 +7,7 @@ from lottery import Lottery
 
 SERVER_HOST = os.environ["SERVER_HOST"]
 SERVER_PORT = int(os.environ["SERVER_PORT"])
-STORAGE_PATH = os.environ["OUTPUT_FILE"]
+STORAGE_PATH = 'tmp/bets.csv'
 AGENCY_QUORUM_MIN = int(os.environ["AGENCY_QUORUM_MIN"])
 
 
