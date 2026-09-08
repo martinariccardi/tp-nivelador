@@ -18,19 +18,24 @@ class Server:
         self.condition = threading.Condition(self.lock)
         self.finished_agencies = 0
 
-        # Shutdown 
-        self.running = True 
+        self.running = True
         self.client_connections = []
         self.active_threads = []
         self.socket = None
-    
+
     def _handle_client(self, client_socket):
         action = "handle-client"
         message_amount = 0
         try:
             logger.info(action, logger.LogResult.in_progress)
             while self.running:
-                client_message = protocol.deserialize(client_socket)
+                try: 
+                    client_message = protocol.deserialize(client_socket)
+                except Exception: 
+                    logger.error(action, logger.LogResult.fail, "malformed-batch", str(e))
+                    self.send_nack 
+                    continue
+                
                 if not client_message:
                     logger.info(
                         action,
@@ -39,29 +44,45 @@ class Server:
                         message_amount,
                     )
                     return
+
                 message_amount += 1
-                # Mejorar
-                if client_message["type"] == "END_BETS":
-                    with self.condition:
-                        self.finished_agencies += 1
-                        self.condition.notify_all()
-                        self.condition.wait_for(
-                            lambda: self.finished_agencies >= self.agency_quorum_min or not self.running
-                        )
-                    winners = self._choose_winners(client_message["data"])
-                    self.send_winners(client_socket, winners)
+                message_type = client_message["type"]
+
+                if message_type == "END_BETS":
+                    self._handle_end_bets(client_socket, client_message["data"])
                     return
-                else:
-                    with self.lock:
-                        self.lottery.store_bets(client_message["data"])
-                    self.send_ack(client_socket)
+
+                if message_type == "NEW_BATCH":
+                    self._handle_new_batch(client_socket, client_message["data"])
+                    continue
+
+                raise ValueError(f"Tipo de mensaje no soportado: {message_type}")
+
         except Exception as e:
             logger.error(
-                action, logger.LogResult.fail, "messages-amount", message_amount
+                action,
+                logger.LogResult.fail,
+                "messages-amount",
+                message_amount,
             )
             raise e
         finally:
             client_socket.close()
+
+    def _handle_new_batch(self, client_socket, bets):
+        with self.lock:
+            self.lottery.store_bets(bets)
+        self.send_ack(client_socket)
+
+    def _handle_end_bets(self, client_socket, agency_id):
+        with self.condition:
+            self.finished_agencies += 1
+            self.condition.notify_all()
+            self.condition.wait_for(
+                lambda: self.finished_agencies >= self.agency_quorum_min or not self.running
+            )
+        winners = self._choose_winners(agency_id)
+        self.send_winners(client_socket, winners)
 
     def _choose_winners(self, agency_id):
         bets = self.lottery.load_bets()
@@ -76,6 +97,9 @@ class Server:
 
     def send_ack(self, socket):
         safe_socket.send_all(socket, protocol.serialize_ack())
+
+    def send_nack(self, socket):
+        safe_socket.send_all(socket, protocol.serialize_nack())
 
     def run(self):
         action = "accept-connection"

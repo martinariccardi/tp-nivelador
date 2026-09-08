@@ -6,6 +6,7 @@ TLV_END_TYPE = 0x02
 TLV_WINNERS_TYPE = 0x03
 TLV_NEW_BATCH_TYPE = 0x04
 TLV_ACK_TYPE = 0x05
+TLV_NACK_TYPE = 0x06
 EXPECTED_FIELDS = 6
 TLV_HEADER_SIZE = 4
 
@@ -39,8 +40,11 @@ def serialize_winners(winners):
         payload.extend(serialize_bet(winner))
     return serialize_tlv_message(TLV_WINNERS_TYPE, payload)
 
-def serialize_ack():
-    return serialize_tlv_message(TLV_ACK_TYPE, bytearray())
+def serialize_ack(msg_type=TLV_ACK_TYPE):
+    return serialize_tlv_message(msg_type, bytearray())
+
+def serialize_nack():
+    return serialize_tlv_message(TLV_NACK_TYPE, bytearray())
 
 def deserialize(socket):
     header = safe_socket.recv_all(socket, TLV_HEADER_SIZE)
@@ -63,8 +67,12 @@ def deserialize(socket):
             "type": "END_BETS",
             "data": agency_id,
         }
+    elif tlv_type == TLV_ACK_TYPE:
+        return {"type": "ACK", "data": None}
+    elif tlv_type == TLV_NACK_TYPE:
+        return {"type": "NACK", "data": None}
     elif tlv_type == TLV_WINNERS_TYPE:
-        raise ValueError(f"Este mensaje no debería ser recibido por el servidor")
+        raise ValueError("Este mensaje no debería ser recibido por el servidor")
     else:
         raise ValueError(f"Tipo de mensaje no reconocido: {tlv_type}")
 
