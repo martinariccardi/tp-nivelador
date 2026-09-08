@@ -5,13 +5,17 @@ import threading
 from . import protocol
 from lottery import Lottery
 
+SHUTDOWN_TIMEOUT = 10.0
+
 class Server:
     def __init__(self, server_host: str, server_port: int, storage_path: str, agency_quorum_min: int) -> None:
         self.server_host = server_host
         self.server_port = server_port
         self.lottery = Lottery(storage_path)
-        self.barrier = threading.Barrier(agency_quorum_min)
         self.lock = threading.Lock()
+        self.agency_quorum_min = agency_quorum_min
+        self.condition = threading.Condition(self.lock)
+        self.finished_agencies = 0
 
     def _handle_client(self, client_socket):
         action = "handle-client"
@@ -31,7 +35,12 @@ class Server:
                 message_amount += 1
                 # Mejorar
                 if client_message["type"] == "END_BETS":
-                    self.barrier.wait()
+                    with self.condition:
+                        self.finished_agencies += 1
+                        self.condition.notify_all()
+                        self.condition.wait_for(
+                            lambda: self.finished_agencies >= self.agency_quorum_min
+                        )
                     winners = self._choose_winners(client_message["data"])
                     self.send_winners(client_socket, winners)
                     return
