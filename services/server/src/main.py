@@ -3,6 +3,7 @@ import sys
 
 import logger
 import server
+import signal
 from lottery import Lottery
 
 SERVER_HOST = os.environ["SERVER_HOST"]
@@ -14,6 +15,7 @@ AGENCY_QUORUM_MIN = int(os.environ["AGENCY_QUORUM_MIN"])
 def main():
     logger.init()
     s = server.Server(SERVER_HOST, SERVER_PORT, STORAGE_PATH, AGENCY_QUORUM_MIN)
+    signal.signal(signal.SIGTERM, s.handle_sigterm)
     try:
         s.run()
     except Exception as e:

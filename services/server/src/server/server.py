@@ -2,6 +2,7 @@ import socket
 import logger
 import safe_socket
 import threading
+import time
 from . import protocol
 from lottery import Lottery
 
@@ -17,12 +18,18 @@ class Server:
         self.condition = threading.Condition(self.lock)
         self.finished_agencies = 0
 
+        # Shutdown 
+        self.running = True 
+        self.client_connections = []
+        self.active_threads = []
+        self.socket = None
+    
     def _handle_client(self, client_socket):
         action = "handle-client"
         message_amount = 0
         try:
             logger.info(action, logger.LogResult.in_progress)
-            while True:
+            while self.running:
                 client_message = protocol.deserialize(client_socket)
                 if not client_message:
                     logger.info(
@@ -39,7 +46,7 @@ class Server:
                         self.finished_agencies += 1
                         self.condition.notify_all()
                         self.condition.wait_for(
-                            lambda: self.finished_agencies >= self.agency_quorum_min
+                            lambda: self.finished_agencies >= self.agency_quorum_min or not self.running
                         )
                     winners = self._choose_winners(client_message["data"])
                     self.send_winners(client_socket, winners)
@@ -53,6 +60,8 @@ class Server:
                 action, logger.LogResult.fail, "messages-amount", message_amount
             )
             raise e
+        finally:
+            client_socket.close()
 
     def _choose_winners(self, agency_id):
         bets = self.lottery.load_bets()
@@ -73,11 +82,15 @@ class Server:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
             server_socket.bind((self.server_host, self.server_port))
             server_socket.listen()
-            while True:
+            self.socket = server_socket
+            while self.running:
                 try:
                     logger.info(action, logger.LogResult.in_progress)
                     client_socket, _ = server_socket.accept()
+                    self.client_connections.append(client_socket)
                 except Exception as e:
+                    if not self.running:
+                        break
                     logger.error(action, logger.LogResult.fail)
                     raise e
                 logger.info(action, logger.LogResult.success)
@@ -86,8 +99,37 @@ class Server:
                     target= self._handle_client,
                     args=(client_socket,)                   
                 )
-                
+
+                self.active_threads.append(thread)
+
                 thread.start()
+
+    def handle_sigterm(self, _signum=None, _frame=None):
+        self.running = False
+
+        with self.condition:
+            self.condition.notify_all()
+
+        if self.socket is not None:
+            try:
+                self.socket.close()
+            except OSError:
+                pass
+
+        for conn in self.client_connections:
+            try: 
+                conn.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
+        deadline = time.time() + SHUTDOWN_TIMEOUT
+        for thread in self.active_threads:
+            time_left = deadline - time.time()
+            if time_left > 0:
+                thread.join(timeout=time_left)
+            else:
+                break
+
                 
 
    
