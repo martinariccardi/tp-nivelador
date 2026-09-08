@@ -1,4 +1,4 @@
-package client
+package protocol
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ type Bet struct {
 	BetNumber string
 }
 
-func parseBetFromCsv(line string, agencyId string) (Bet, error) {
+func ParseBetFromCsv(line string, agencyId string) (Bet, error) {
 	parts := strings.Split(line, ",")
 
 	if len(parts) != EXPECTED_CSV_FIELDS {

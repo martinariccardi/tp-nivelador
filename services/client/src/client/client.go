@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/logger"
+	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/protocol"
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/safe_socket"
 )
 
@@ -84,7 +85,7 @@ func (client *Client) Run() error {
 
 	messageId := 0
 
-	collected_bets := make([]Bet, 0, client.config.BatchSize)
+	collected_bets := make([]protocol.Bet, 0, client.config.BatchSize)
 
 	for reader.Scan() {
 		messageId++
@@ -93,7 +94,7 @@ func (client *Client) Run() error {
 
 		clientMessage := reader.Text()
 
-		bet, err := parseBetFromCsv(clientMessage, client.config.AgencyId)
+		bet, err := protocol.ParseBetFromCsv(clientMessage, client.config.AgencyId)
 		if err != nil {
 			return err
 		}
@@ -106,7 +107,7 @@ func (client *Client) Run() error {
 		)
 
 		if len(collected_bets) == client.config.BatchSize {
-			serializedBatch, err := serialize_batch(collected_bets)
+			serializedBatch, err := protocol.SerializeBatch(collected_bets)
 			if err != nil {
 				return err
 			}
@@ -116,7 +117,7 @@ func (client *Client) Run() error {
 				return err
 			}
 
-			if err := deserialize_ack(client.conn); err != nil {
+			if err := protocol.DeserializeAck(client.conn); err != nil {
 				logger.Error("receive-ack", logger.Fail, "agency-id", client.config.AgencyId, "err", err)
 				return err
 			}
@@ -134,7 +135,7 @@ func (client *Client) Run() error {
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 
 	if len(collected_bets) > 0 {
-		serializedBatch, err := serialize_batch(collected_bets)
+		serializedBatch, err := protocol.SerializeBatch(collected_bets)
 		if err != nil {
 			return err
 		}
@@ -144,7 +145,7 @@ func (client *Client) Run() error {
 			return err
 		}
 
-		if err := deserialize_ack(client.conn); err != nil {
+		if err := protocol.DeserializeAck(client.conn); err != nil {
 			logger.Error("receive-ack", logger.Fail, "agency-id", client.config.AgencyId, "err", err)
 			return err
 		}
@@ -158,7 +159,7 @@ func (client *Client) Run() error {
 		collected_bets = collected_bets[:0]
 	}
 
-	endBetsMessage, err := serialize_end_message(client.config.AgencyId)
+	endBetsMessage, err := protocol.SerializeEndMessage(client.config.AgencyId)
 	if err != nil {
 		return err
 	}
@@ -167,7 +168,7 @@ func (client *Client) Run() error {
 		return err
 	}
 
-	winners, err := deserialize_winners(client.conn)
+	winners, err := protocol.DeserializeWinners(client.conn)
 	if err != nil {
 		return err
 	}
@@ -179,7 +180,7 @@ func (client *Client) Run() error {
 	return nil
 }
 
-func storeWinners(writer *bufio.Writer, winners []Bet) error {
+func storeWinners(writer *bufio.Writer, winners []protocol.Bet) error {
 	for _, winner := range winners {
 		line := fmt.Sprintf("%s,%s,%s,%s,%s\n",
 			winner.FirstName,

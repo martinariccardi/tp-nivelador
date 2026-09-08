@@ -1,7 +1,6 @@
-package client
+package protocol
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -9,76 +8,7 @@ import (
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/safe_socket"
 )
 
-const TLV_BET_TYPE uint16 = 0x01
-const TLV_END_TYPE uint16 = 0x02
-const TLV_WINNER_TYPE uint16 = 0x03
-const TLV_NEW_BATCH_TYPE uint16 = 0x04
-const TLV_ACK_TYPE uint16 = 0x05
-const TLV_NACK_TYPE uint16 = 0x06
-const EXPECTED_FIELDS = 6
-const TLV_HEADER_SIZE = 4
-
-func serialize_tlv_message(msgType uint16, payload []byte) ([]byte, error) {
-	message := new(bytes.Buffer)
-	if err := binary.Write(message, binary.BigEndian, msgType); err != nil {
-		return nil, err
-	}
-	if err := binary.Write(message, binary.BigEndian, uint16(len(payload))); err != nil {
-		return nil, err
-	}
-	message.Write(payload)
-	return message.Bytes(), nil
-}
-
-func serialize_end_message(agencyId string) ([]byte, error) {
-	payload := []byte(agencyId)
-	return serialize_tlv_message(TLV_END_TYPE, payload)
-}
-
-func serialize_bet(bet Bet) ([]byte, error) {
-	fields := []string{
-		bet.AgencyId,
-		bet.FirstName,
-		bet.LastName,
-		bet.Id,
-		bet.Birthdate,
-		bet.BetNumber,
-	}
-
-	payload := new(bytes.Buffer)
-	// Build body
-	for i, field := range fields {
-		// Type
-		if err := binary.Write(payload, binary.BigEndian, uint16(i+1)); err != nil {
-			return nil, err
-		}
-		// Size
-		if err := binary.Write(payload, binary.BigEndian, uint16(len(field))); err != nil {
-			return nil, err
-		}
-		// Value
-		payload.WriteString(field)
-	}
-
-	return serialize_tlv_message(TLV_BET_TYPE, payload.Bytes())
-}
-
-func serialize_batch(bets []Bet) ([]byte, error) {
-	payload := new(bytes.Buffer)
-	for _, bet := range bets {
-		serializedBet, err := serialize_bet(bet)
-		if err != nil {
-			return nil, err
-		}
-		_, err = payload.Write(serializedBet)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return serialize_tlv_message(TLV_NEW_BATCH_TYPE, payload.Bytes())
-}
-
-func deserialize_ack(socket io.Reader) error {
+func DeserializeAck(socket io.Reader) error {
 	header, err := safe_socket.RecvAll(socket, TLV_HEADER_SIZE)
 	if err != nil {
 		return err
@@ -101,7 +31,7 @@ func deserialize_ack(socket io.Reader) error {
 	}
 }
 
-func deserialize_winners(socket io.Reader) ([]Bet, error) {
+func DeserializeWinners(socket io.Reader) ([]Bet, error) {
 	header, err := safe_socket.RecvAll(socket, TLV_HEADER_SIZE)
 	if err != nil {
 		return []Bet{}, err
