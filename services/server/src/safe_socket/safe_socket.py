@@ -7,9 +7,9 @@ def recv_all(socket: socket.socket, size):
     buffer = bytearray()
     while bytes_received < size: 
         data = socket.recv(size - bytes_received)
-        bytes_received += len(data)
         if not data:
             raise ConnectionError
+        bytes_received += len(data)
         buffer.extend(data)
     return bytes(buffer)
 
@@ -19,7 +19,7 @@ def send_all(socket: socket.socket, bytes):
     while bytes_sent < len(bytes): 
         bytes_written = socket.send(bytes[bytes_sent:])
         if bytes_written == 0:
-            raise ConnectionError
+            continue
         bytes_sent += bytes_written
     
 
