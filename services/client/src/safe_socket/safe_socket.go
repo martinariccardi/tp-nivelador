@@ -23,10 +23,10 @@ func RecvAll(socket io.Reader, size int) ([]byte, error) {
 		bytes_read, err := socket.Read(buff[bytes_received:])
 		bytes_received += bytes_read
 		if err != nil {
-			if bytes_received == size {
-				break
-			}
 			return nil, err
+		}
+		if bytes_read == 0 {
+			break
 		}
 	}
 	return buff, nil
