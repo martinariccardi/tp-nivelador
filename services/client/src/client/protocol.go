@@ -14,12 +14,13 @@ const TLV_END_TYPE uint16 = 0x02
 const TLV_WINNER_TYPE uint16 = 0x03
 const TLV_NEW_BATCH_TYPE uint16 = 0x04
 const TLV_ACK_TYPE uint16 = 0x05
+const TLV_NACK_TYPE uint16 = 0x06
 const EXPECTED_FIELDS = 6
 const TLV_HEADER_SIZE = 4
 
-func serialize_tlv_message(msg_type uint16, payload []byte) ([]byte, error) {
+func serialize_tlv_message(msgType uint16, payload []byte) ([]byte, error) {
 	message := new(bytes.Buffer)
-	if err := binary.Write(message, binary.BigEndian, msg_type); err != nil {
+	if err := binary.Write(message, binary.BigEndian, msgType); err != nil {
 		return nil, err
 	}
 	if err := binary.Write(message, binary.BigEndian, uint16(len(payload))); err != nil {
@@ -65,11 +66,11 @@ func serialize_bet(bet Bet) ([]byte, error) {
 func serialize_batch(bets []Bet) ([]byte, error) {
 	payload := new(bytes.Buffer)
 	for _, bet := range bets {
-		serialized_bet, err := serialize_bet(bet)
+		serializedBet, err := serialize_bet(bet)
 		if err != nil {
 			return nil, err
 		}
-		_, err = payload.Write(serialized_bet)
+		_, err = payload.Write(serializedBet)
 		if err != nil {
 			return nil, err
 		}
@@ -84,11 +85,17 @@ func deserialize_ack(socket io.Reader) error {
 	}
 
 	tlvType := binary.BigEndian.Uint16(header[0:2])
-	_ = int(binary.BigEndian.Uint16(header[2:4]))
+	tlvSize := int(binary.BigEndian.Uint16(header[2:4]))
+
+	if tlvSize > 0 {
+		return fmt.Errorf("formato de mensaje incorrecto")
+	}
 
 	switch tlvType {
 	case TLV_ACK_TYPE:
 		return nil
+	case TLV_NACK_TYPE:
+		return fmt.Errorf("el servidor rechazó el batch")
 	default:
 		return fmt.Errorf("tipo de mensaje inesperado")
 	}
@@ -105,26 +112,36 @@ func deserialize_winners(socket io.Reader) ([]Bet, error) {
 
 	switch tlvType {
 	case TLV_WINNER_TYPE:
-		tlv_value, err := safe_socket.RecvAll(socket, tlvSize)
+		tlvValue, err := safe_socket.RecvAll(socket, tlvSize)
 		if err != nil {
 			return []Bet{}, err
 		}
-		return extractBets(tlv_value), nil
+		return extractBets(tlvValue)
 	default:
 		return []Bet{}, fmt.Errorf("tipo de mensaje inesperado")
 	}
 }
 
-func extractBet(rawBet []byte) Bet {
+func extractBet(rawBet []byte) (Bet, error) {
 	index := 0
 	var elems []string
 
 	for index < len(rawBet) {
+		if index+TLV_HEADER_SIZE > len(rawBet) {
+			return Bet{}, fmt.Errorf("formato de apuesta incorrecto")
+		}
 		length := int(binary.BigEndian.Uint16(rawBet[index+2 : index+4]))
 		index += TLV_HEADER_SIZE
+		if index+length > len(rawBet) {
+			return Bet{}, fmt.Errorf("formato de apuesta incorrecto")
+		}
 		content := string(rawBet[index : index+length])
 		elems = append(elems, content)
 		index += length
+	}
+
+	if len(elems) != EXPECTED_FIELDS {
+		return Bet{}, fmt.Errorf("formato de apuesta incorrecto")
 	}
 
 	return Bet{
@@ -134,20 +151,30 @@ func extractBet(rawBet []byte) Bet {
 		Id:        elems[3],
 		Birthdate: elems[4],
 		BetNumber: elems[5],
-	}
+	}, nil
 }
 
-func extractBets(payload []byte) []Bet {
+func extractBets(payload []byte) ([]Bet, error) {
 	index := 0
 	var bets []Bet
 
 	for index < len(payload) {
+		if index+TLV_HEADER_SIZE > len(payload) {
+			return []Bet{}, fmt.Errorf("formato de apuesta incorrecto")
+		}
 		length := int(binary.BigEndian.Uint16(payload[index+2 : index+4]))
 		index += TLV_HEADER_SIZE
+		if index+length > len(payload) {
+			return []Bet{}, fmt.Errorf("formato de apuesta incorrecto")
+		}
 		content := payload[index : index+length]
-		bets = append(bets, extractBet(content))
+		bet, err := extractBet(content)
+		if err != nil {
+			return []Bet{}, err
+		}
+		bets = append(bets, bet)
 		index += length
 	}
 
-	return bets
+	return bets, nil
 }
