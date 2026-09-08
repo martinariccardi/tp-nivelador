@@ -197,3 +197,10 @@ func storeWinners(writer *bufio.Writer, winners []Bet) error {
 
 	return nil
 }
+
+func (client *Client) Close() error {
+	if client.conn != nil {
+		return client.conn.Close()
+	}
+	return nil
+}
