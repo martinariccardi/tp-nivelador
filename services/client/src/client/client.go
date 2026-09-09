@@ -65,12 +65,12 @@ func (client *Client) Run() error {
 	const mainAction = "test-echo-server"
 	defer client.conn.Close()
 
-	input_file, err := os.Open(client.config.InputFile)
+	inputFile, err := os.Open(client.config.InputFile)
 	if err != nil {
 		logger.Error("open-input-file", logger.Fail, "err", err)
 		return err
 	}
-	defer input_file.Close()
+	defer inputFile.Close()
 
 	outputFile, err := os.Create(client.config.OutputFile)
 	if err != nil {
@@ -79,13 +79,13 @@ func (client *Client) Run() error {
 	}
 	defer outputFile.Close()
 
-	reader := bufio.NewScanner(input_file)
+	reader := bufio.NewScanner(inputFile)
 	writer := bufio.NewWriter(outputFile)
 	defer writer.Flush()
 
 	messageId := 0
 
-	collected_bets := make([]protocol.Bet, 0, client.config.BatchSize)
+	collectedBets := make([]protocol.Bet, 0, client.config.BatchSize)
 
 	for reader.Scan() {
 		messageId++
@@ -99,64 +99,29 @@ func (client *Client) Run() error {
 			return err
 		}
 
-		collected_bets = append(collected_bets, bet)
+		collectedBets = append(collectedBets, bet)
 
 		logger.Info("send-message", logger.InProgress,
 			"agency-id", client.config.AgencyId,
 			"message-id", messageId,
 		)
 
-		if len(collected_bets) == client.config.BatchSize {
-			serializedBatch, err := protocol.SerializeBatch(collected_bets)
-			if err != nil {
+		if len(collectedBets) == client.config.BatchSize {
+			if err := client.sendBatch(collectedBets, "send-message", messageArgs); err != nil {
 				return err
 			}
-
-			if err := safe_socket.SendAll(client.conn, serializedBatch); err != nil {
-				logger.Error("send-message", logger.Fail, messageArgs...)
-				return err
-			}
-
-			if err := protocol.DeserializeAck(client.conn); err != nil {
-				logger.Error("receive-ack", logger.Fail, "agency-id", client.config.AgencyId, "err", err)
-				return err
-			}
-
-			collected_bets = collected_bets[:0]
-
-			logger.Info("send-message", logger.Success,
-				"agency-id", client.config.AgencyId,
-				"message-id", messageId,
-				"sent-bytes", len(serializedBatch),
-			)
+			collectedBets = collectedBets[:0]
 		}
 
 	}
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 
-	if len(collected_bets) > 0 {
-		serializedBatch, err := protocol.SerializeBatch(collected_bets)
-		if err != nil {
+	if len(collectedBets) > 0 {
+		messageArgs := []any{"agency-id", client.config.AgencyId, "remaining-count", len(collectedBets)}
+		if err := client.sendBatch(collectedBets, "send-remaining-message", messageArgs); err != nil {
 			return err
 		}
-
-		if err := safe_socket.SendAll(client.conn, serializedBatch); err != nil {
-			logger.Error("send-remaining-message", logger.Fail, "agency-id", client.config.AgencyId, "err", err)
-			return err
-		}
-
-		if err := protocol.DeserializeAck(client.conn); err != nil {
-			logger.Error("receive-ack", logger.Fail, "agency-id", client.config.AgencyId, "err", err)
-			return err
-		}
-
-		logger.Info("send-remaining-message", logger.Success,
-			"agency-id", client.config.AgencyId,
-			"sent-bytes", len(serializedBatch),
-			"remaining-count", len(collected_bets),
-		)
-
-		collected_bets = collected_bets[:0]
+		collectedBets = collectedBets[:0]
 	}
 
 	endBetsMessage, err := protocol.SerializeEndMessage(client.config.AgencyId)
@@ -196,6 +161,33 @@ func storeWinners(writer *bufio.Writer, winners []protocol.Bet) error {
 		}
 	}
 
+	return nil
+}
+
+func (client *Client) sendBatch(bets []protocol.Bet, action string, messageArgs []any) error {
+	if len(bets) == 0 {
+		return nil
+	}
+
+	serializedBatch, err := protocol.SerializeBatch(bets)
+	if err != nil {
+		return err
+	}
+
+	if err := safe_socket.SendAll(client.conn, serializedBatch); err != nil {
+		logger.Error(action, logger.Fail, messageArgs...)
+		return err
+	}
+
+	if err := protocol.DeserializeAck(client.conn); err != nil {
+		logger.Error("receive-ack", logger.Fail, "agency-id", client.config.AgencyId, "err", err)
+		return err
+	}
+
+	logger.Info(action, logger.Success,
+		"agency-id", client.config.AgencyId,
+		"sent-bytes", len(serializedBatch),
+	)
 	return nil
 }
 
