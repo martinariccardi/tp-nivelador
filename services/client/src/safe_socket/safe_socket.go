@@ -26,7 +26,7 @@ func RecvAll(socket io.Reader, size int) ([]byte, error) {
 			return nil, err
 		}
 		if bytes_read == 0 {
-			break
+			continue
 		}
 	}
 	return buff, nil

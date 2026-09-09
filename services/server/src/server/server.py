@@ -31,7 +31,7 @@ class Server:
             while self.running:
                 try: 
                     client_message = protocol.deserialize(client_socket)
-                except Exception: 
+                except Exception as e: 
                     logger.error(action, logger.LogResult.fail, "malformed-batch", str(e))
                     self.send_nack 
                     continue
@@ -81,7 +81,8 @@ class Server:
             self.condition.wait_for(
                 lambda: self.finished_agencies >= self.agency_quorum_min or not self.running
             )
-        winners = self._choose_winners(agency_id)
+        with self.lock:
+            winners = self._choose_winners(agency_id)
         self.send_winners(client_socket, winners)
 
     def _choose_winners(self, agency_id):
