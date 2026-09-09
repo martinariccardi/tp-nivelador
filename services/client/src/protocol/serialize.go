@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 )
 
+// SerializeTlvMessage encodes a TLV message with a 2-byte type and a 2-byte
+// length (big-endian) followed by `payload` bytes.
 func SerializeTlvMessage(msgType uint16, payload []byte) ([]byte, error) {
 	message := new(bytes.Buffer)
 	if err := binary.Write(message, binary.BigEndian, msgType); err != nil {
@@ -17,11 +19,17 @@ func SerializeTlvMessage(msgType uint16, payload []byte) ([]byte, error) {
 	return message.Bytes(), nil
 }
 
+// SerializeEndMessage creates a TLV_END_TYPE message whose payload is the
+// ASCII agency identifier. The server uses this message to detect the end
+// of the client's transmission.
 func SerializeEndMessage(agencyId string) ([]byte, error) {
 	payload := []byte(agencyId)
 	return SerializeTlvMessage(TLV_END_TYPE, payload)
 }
 
+// SerializeBet encodes a single Bet into an inner TLV sequence that contains
+// the individual bet fields as TLV entries. The returned bytes are then
+// wrapped into a TLV_BET_TYPE message by the caller.
 func SerializeBet(bet Bet) ([]byte, error) {
 	fields := []string{
 		bet.AgencyId,
@@ -50,6 +58,9 @@ func SerializeBet(bet Bet) ([]byte, error) {
 	return SerializeTlvMessage(TLV_BET_TYPE, payload.Bytes())
 }
 
+// SerializeBatch concatenates the serialized representation of multiple
+// bets and wraps them into a TLV_NEW_BATCH_TYPE message suitable for
+// transmission to the server.
 func SerializeBatch(bets []Bet) ([]byte, error) {
 	payload := new(bytes.Buffer)
 	for _, bet := range bets {

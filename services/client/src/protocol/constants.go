@@ -1,5 +1,6 @@
 package protocol
 
+// TLV constants used by the protocol.
 const (
 	TLV_BET_TYPE       uint16 = 0x01
 	TLV_END_TYPE       uint16 = 0x02

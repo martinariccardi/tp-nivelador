@@ -7,6 +7,7 @@ import (
 
 const EXPECTED_CSV_FIELDS = 5
 
+// represents a lottery bet
 type Bet struct {
 	AgencyId  string
 	FirstName string
@@ -16,6 +17,9 @@ type Bet struct {
 	BetNumber string
 }
 
+// parses a CSV line into a `Bet` value.
+// Returns an error when the line does not contain the expected
+// number of fields.
 func ParseBetFromCsv(line string, agencyId string) (Bet, error) {
 	parts := strings.Split(line, ",")
 

@@ -8,6 +8,9 @@ import (
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/safe_socket"
 )
 
+// reads a TLV header from `socket` and validates that it is
+// an ACK/NACK message with an empty payload. Returns nil for ACK, an error
+// for NACK or an unexpected format otherwise.
 func DeserializeAck(socket io.Reader) error {
 	header, err := safe_socket.RecvAll(socket, TLV_HEADER_SIZE)
 	if err != nil {
@@ -31,6 +34,9 @@ func DeserializeAck(socket io.Reader) error {
 	}
 }
 
+// expects a TLV_WINNER_TYPE message header and returns
+// the decoded list of winners.
+// returns an error for unexpected TLV types or incorrect bets.
 func DeserializeWinners(socket io.Reader) ([]Bet, error) {
 	header, err := safe_socket.RecvAll(socket, TLV_HEADER_SIZE)
 	if err != nil {
@@ -52,6 +58,8 @@ func DeserializeWinners(socket io.Reader) ([]Bet, error) {
 	}
 }
 
+// extractBet decodes a bet.
+// It returns an error when the bet is not formatted correctly.
 func extractBet(rawBet []byte) (Bet, error) {
 	index := 0
 	var elems []string
@@ -84,6 +92,7 @@ func extractBet(rawBet []byte) (Bet, error) {
 	}, nil
 }
 
+// decodes a sequence of bets.
 func extractBets(payload []byte) ([]Bet, error) {
 	index := 0
 	var bets []Bet

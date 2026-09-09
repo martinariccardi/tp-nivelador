@@ -1,3 +1,6 @@
+// Package client implements the lottery client that reads bets from an
+// input CSV, sends them to the lottery server in configurable batches and
+// persists the winners to an output file.
 package client
 
 import (
@@ -114,6 +117,11 @@ func (client *Client) Run() error {
 		}
 
 	}
+
+	if err := reader.Err(); err != nil {
+		return fmt.Errorf("error al leer los datos: %w", err)
+	}
+
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 
 	if len(collectedBets) > 0 {
@@ -145,6 +153,10 @@ func (client *Client) Run() error {
 	return nil
 }
 
+// writes the `winners` slice to the corresponding output file.
+// Each winner is written as a single line with the fields:
+// FirstName,LastName,Id,Birthdate,BetNumber
+// Returns an error if writing to `writer` fails.
 func storeWinners(writer *bufio.Writer, winners []protocol.Bet) error {
 	for _, winner := range winners {
 		line := fmt.Sprintf("%s,%s,%s,%s,%s\n",
@@ -164,6 +176,8 @@ func storeWinners(writer *bufio.Writer, winners []protocol.Bet) error {
 	return nil
 }
 
+// serializes the bets slice into a batch,
+// sends it and waits for a server acknowledgement.
 func (client *Client) sendBatch(bets []protocol.Bet, action string, messageArgs []any) error {
 	if len(bets) == 0 {
 		return nil
@@ -191,6 +205,8 @@ func (client *Client) sendBatch(bets []protocol.Bet, action string, messageArgs 
 	return nil
 }
 
+// Close closes the network connection if it is open.
+// It returns any error produced by `net.Conn.Close()`.
 func (client *Client) Close() error {
 	if client.conn != nil {
 		return client.conn.Close()
