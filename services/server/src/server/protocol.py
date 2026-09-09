@@ -10,6 +10,9 @@ TLV_NACK_TYPE = 0x06
 EXPECTED_FIELDS = 6
 TLV_HEADER_SIZE = 4
 
+class InvalidBetError(ValueError):
+    pass
+
 def serialize_tlv_message(msg_type, payload):
     header = msg_type.to_bytes(2, byteorder='big') + len(payload).to_bytes(2, byteorder='big')
     return header + bytes(payload)
@@ -81,8 +84,12 @@ def extract_bet(bet):
     index = 0
     elems = []
     while index < len(bet):
+        if index+TLV_HEADER_SIZE > len(bet):
+            raise InvalidBetError
         length = int.from_bytes(bet[index+2:index+4], byteorder='big')
         index += TLV_HEADER_SIZE
+        if index+length > len(bet):
+            raise InvalidBetError
         content = bet[index:index + length].decode("utf-8")
         elems.append(content)
         index += length
@@ -100,8 +107,12 @@ def extract_bets(payload):
     index = 0
     bets = []
     while index < len(payload):
+        if index+TLV_HEADER_SIZE > len(payload):
+            raise InvalidBetError
         length = int.from_bytes(payload[index+2:index+4], byteorder='big')
         index += TLV_HEADER_SIZE
+        if index+length > len(payload):
+            raise InvalidBetError
         content = payload[index:index + length]
         bets.append(extract_bet(content))
         index += length
