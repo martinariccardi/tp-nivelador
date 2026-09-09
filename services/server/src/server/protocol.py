@@ -14,10 +14,12 @@ class InvalidBetError(ValueError):
     pass
 
 def serialize_tlv_message(msg_type, payload):
+    """Create a TLV message header and return header+payload bytes"""
     header = msg_type.to_bytes(2, byteorder='big') + len(payload).to_bytes(2, byteorder='big')
     return header + bytes(payload)
 
 def serialize_bet(bet):
+    """Serialize a `Bet` into a TLV sequence"""
     fields = [
         str(bet.agency_id),
         str(bet.first_name),
@@ -38,18 +40,22 @@ def serialize_bet(bet):
 
 
 def serialize_winners(winners):
+    """Serialize a list of `Bet` winners into a TLV_WINNERS_TYPE message"""
     payload = bytearray()
     for winner in winners:
         payload.extend(serialize_bet(winner))
     return serialize_tlv_message(TLV_WINNERS_TYPE, payload)
 
-def serialize_ack(msg_type=TLV_ACK_TYPE):
-    return serialize_tlv_message(msg_type, bytearray())
+def serialize_ack():
+    """Return an ACK TLV message with an empty payload"""
+    return serialize_tlv_message(TLV_ACK_TYPE, bytearray())
 
 def serialize_nack():
+    """Return a NACK TLV message with an empty payload."""
     return serialize_tlv_message(TLV_NACK_TYPE, bytearray())
 
 def deserialize(socket):
+    """Read and decode a single TLV message from `socket` """
     header = safe_socket.recv_all(socket, TLV_HEADER_SIZE)
     if not header:
         return None
@@ -70,17 +76,14 @@ def deserialize(socket):
             "type": "END_BETS",
             "data": agency_id,
         }
-    elif tlv_type == TLV_ACK_TYPE:
-        return {"type": "ACK", "data": None}
-    elif tlv_type == TLV_NACK_TYPE:
-        return {"type": "NACK", "data": None}
-    elif tlv_type == TLV_WINNERS_TYPE:
+    elif tlv_type in (TLV_ACK_TYPE, TLV_NACK_TYPE, TLV_WINNERS_TYPE, TLV_BET_TYPE):
         raise ValueError("Este mensaje no debería ser recibido por el servidor")
     else:
         raise ValueError(f"Tipo de mensaje no reconocido: {tlv_type}")
 
 
 def extract_bet(bet):
+    """Decode a single bet from `bet` (bytes)"""
     index = 0
     elems = []
     while index < len(bet):
@@ -104,6 +107,7 @@ def extract_bet(bet):
     )
 
 def extract_bets(payload):
+    """Decode a payload containing one or more serialized bets"""
     index = 0
     bets = []
     while index < len(payload):
