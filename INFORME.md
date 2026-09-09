@@ -88,13 +88,14 @@ number = "7574"
 
 Cada subcampo se codifica como índice (2 bytes) + longitud (2 bytes) + valor, y luego todo el conjunto se envuelve en el TLV externo de tipo BET (0x01):
 
+```text
 Serialización
 00 01 00 36 00 01 00 01 31 00 02 00 03 41 6e 61
 00 03 00 04 44 69 61 7a 00 04 00 08 33 30 39 30
 34 34 36 35 00 05 00 0a 31 39 39 39 2d 30 33 2d
 31 37 00 06 00 04 37 35 37 34
 
-Serialización (desglose)
+Serialización (detalle)
 00 01 00 36                              (TLV externo: tipo=BET, longitud=54)
      00 01 00 01 31                      (índice 1, longitud 1: agency_id = "1")
      00 02 00 03 41 6e 61                (índice 2, longitud 3: first_name = "Ana")
@@ -103,6 +104,7 @@ Serialización (desglose)
      00 05 00 0a 31 39 39 39 2d 30 33 2d
      31 37                               (índice 5, longitud 10: birthdate = "1999-03-17")
      00 06 00 04 37 35 37 34             (índice 6, longitud 4: number = "7574")
+```
 
 Todos los subcampos se serializan como texto (UTF-8), incluso los que representan números. No hay campos binarios de tamaño fijo como en un protocolo tipo integer/string tipado, sino que todo viaja como string con su longitud explícita.
 
