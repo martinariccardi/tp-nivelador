@@ -33,7 +33,7 @@ class Server:
                     client_message = protocol.deserialize(client_socket)
                 except Exception as e: 
                     logger.error(action, logger.LogResult.fail, "malformed-batch", str(e))
-                    self.send_nack 
+                    self.send_nack(client_socket)
                     continue
                 
                 if not client_message:
